@@ -127,7 +127,7 @@ export default function WeightTracker({ entries, onAdd, onDelete }: Props) {
         <div className="summary-card">
           <span>最新の記録</span>
           <div className="weight-summary">
-            <span className="calories-total">{latest.weight} kg</span>
+            <span className="calories-total">{latest.weight.toFixed(1)} kg</span>
             {diff !== null && (
               <span className={`weight-diff ${diff > 0 ? 'up' : 'down'}`}>
                 {diff > 0 ? '+' : ''}{diff.toFixed(1)} kg
@@ -171,7 +171,7 @@ export default function WeightTracker({ entries, onAdd, onDelete }: Props) {
               <Tooltip
                 contentStyle={{ backgroundColor: '#1e1e2e', border: '1px solid #444' }}
                 formatter={(v, name) =>
-                  name === 'weight' ? [`${v} kg`, '体重'] : [`${v} %`, '体脂肪率']
+                 name === 'weight' ? [`${Number(v).toFixed(1)} kg`, '体重'] : [`${Number(v).toFixed(1)} %`, '体脂肪率']
                 }
               />
               <Legend
@@ -223,7 +223,7 @@ export default function WeightTracker({ entries, onAdd, onDelete }: Props) {
                 )}
                 {entry.note && <span className="entry-time">{entry.note}</span>}
               </div>
-              <span className="entry-calories">{entry.weight} kg</span>
+              <span className="entry-calories">{entry.weight.toFixed(1)} kg</span>
               <button
                 className="btn-delete"
                 onClick={() => onDelete(entry.id)}
