@@ -134,7 +134,7 @@ export default function WeightTracker({ entries, onAdd, onDelete }: Props) {
               </span>
             )}
             {latest.bodyFat != null && (
-              <span className="bodyfat-label">体脂肪率 {latest.bodyFat} %</span>
+             <span className="bodyfat-label">体脂肪率 {latest.bodyFat.toFixed(1)} %</span>
             )}
             {latest.bmr != null && (
               <span className="bmr-label">基礎代謝 {latest.bmr} kcal</span>
@@ -215,7 +215,7 @@ export default function WeightTracker({ entries, onAdd, onDelete }: Props) {
                 {(entry.bodyFat != null || entry.bmr != null || entry.bodyAge != null) && (
                   <span className="entry-time">
                     {[
-                      entry.bodyFat != null && `体脂肪 ${entry.bodyFat}%`,
+                      entry.bodyFat != null && `体脂肪 ${entry.bodyFat.toFixed(1)}%`,
                       entry.bmr != null && `基礎代謝 ${entry.bmr}kcal`,
                       entry.bodyAge != null && `体内年齢 ${entry.bodyAge}歳`,
                     ].filter(Boolean).join('　')}
