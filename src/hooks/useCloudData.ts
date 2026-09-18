@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { MealEntry, SleepEntry, WeightEntry, StepEntry, BowelEntry, Profile } from '../types';
+import type { MealEntry, SleepEntry, WeightEntry, StepEntry, BowelEntry, ConditionEntry, Profile } from '../types';
 import type { CustomFoodItem } from '../data/foodDatabase';
 import type { BackupData } from '../utils/backup';
 
@@ -10,6 +10,7 @@ interface CloudState {
   stepEntries: StepEntry[];
   bowelEntries: BowelEntry[];
   customFoods: CustomFoodItem[];
+  conditions: ConditionEntry[];
   profile: Profile;
 }
 
@@ -20,6 +21,7 @@ const EMPTY_STATE: CloudState = {
   stepEntries: [],
   bowelEntries: [],
   customFoods: [],
+  conditions: [],
   profile: {},
 };
 
@@ -80,7 +82,7 @@ export function useCloudData() {
   );
 
   const deleteEntry = useCallback(
-    <K extends 'meals' | 'sleepEntries' | 'weightEntries' | 'stepEntries' | 'bowelEntries' | 'customFoods'>(
+    <K extends 'meals' | 'sleepEntries' | 'weightEntries' | 'stepEntries' | 'bowelEntries' | 'customFoods' | 'conditions'>(
       key: K,
       resource: string,
       id: string
@@ -121,6 +123,31 @@ export function useCloudData() {
     deleteEntry('customFoods', 'custom-foods', id);
   }, [deleteEntry]);
 
+  const addCondition = useCallback((condition: ConditionEntry) => {
+    setData((prev) => ({ ...prev, conditions: [...prev.conditions, condition] }));
+    apiFetch('/api/entries/conditions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(condition),
+    }).catch(() => setError('保存に失敗しました。通信環境を確認してください。'));
+  }, []);
+
+  const updateCondition = useCallback((condition: ConditionEntry) => {
+    setData((prev) => ({
+      ...prev,
+      conditions: prev.conditions.map((c) => (c.id === condition.id ? condition : c)),
+    }));
+    apiFetch('/api/entries/conditions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(condition),
+    }).catch(() => setError('保存に失敗しました。通信環境を確認してください。'));
+  }, []);
+
+  const deleteCondition = useCallback((id: string) => {
+    deleteEntry('conditions', 'conditions', id);
+  }, [deleteEntry]);
+
   const saveProfile = useCallback((profile: Profile) => {
     setData((prev) => ({ ...prev, profile }));
     apiFetch('/api/profile', {
@@ -138,6 +165,7 @@ export function useCloudData() {
       stepEntries: backup.stepEntries,
       bowelEntries: backup.bowelEntries,
       customFoods: backup.customFoods,
+      conditions: backup.conditions,
       profile: backup.profile,
     };
     await apiFetch('/api/restore', {
@@ -166,6 +194,9 @@ export function useCloudData() {
     addCustomFood,
     updateCustomFood,
     deleteCustomFood,
+    addCondition,
+    updateCondition,
+    deleteCondition,
     saveProfile,
     restoreAll,
   };

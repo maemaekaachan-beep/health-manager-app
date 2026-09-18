@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { sql, LIST_TABLES, isListResource } from '../_db.js';
+import { sql, LIST_TABLES, isListResource, resourceHasDate } from '../_db.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const resourceParam = req.query.resource;
@@ -11,7 +11,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const table = LIST_TABLES[resource];
-  const hasDate = resource !== 'custom-foods';
+  const hasDate = resourceHasDate(resource);
 
   try {
     if (req.method === 'GET') {

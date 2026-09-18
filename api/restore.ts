@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { sql, LIST_TABLES } from './_db.js';
+import { sql, LIST_TABLES, resourceHasDate } from './_db.js';
 import type { NeonQueryInTransaction } from '@neondatabase/serverless';
 
 type ListEntry = { id: string; date?: string; [key: string]: unknown };
@@ -11,6 +11,7 @@ interface RestoreBody {
   stepEntries?: ListEntry[];
   bowelEntries?: ListEntry[];
   customFoods?: ListEntry[];
+  conditions?: ListEntry[];
   profile?: Record<string, unknown>;
 }
 
@@ -21,6 +22,7 @@ const LIST_KEY_TO_RESOURCE = {
   stepEntries: 'steps',
   bowelEntries: 'bowel',
   customFoods: 'custom-foods',
+  conditions: 'conditions',
 } as const;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -41,7 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         keyof typeof LIST_TABLES,
       ][]) {
         const table = LIST_TABLES[resource];
-        const hasDate = resource !== 'custom-foods';
+        const hasDate = resourceHasDate(resource);
         const entries = body[dataKey] ?? [];
 
         queries.push(txn.query(`truncate table ${table}`));

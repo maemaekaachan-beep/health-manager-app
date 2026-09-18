@@ -1,7 +1,7 @@
-import type { MealEntry, SleepEntry, WeightEntry, StepEntry, BowelEntry, Profile } from '../types';
+import type { MealEntry, SleepEntry, WeightEntry, StepEntry, BowelEntry, ConditionEntry, Profile } from '../types';
 import type { CustomFoodItem } from '../data/foodDatabase';
 
-export const BACKUP_VERSION = 3;
+export const BACKUP_VERSION = 4;
 
 export interface BackupData {
   version: number;
@@ -12,6 +12,7 @@ export interface BackupData {
   stepEntries: StepEntry[];
   bowelEntries: BowelEntry[];
   customFoods: CustomFoodItem[];
+  conditions: ConditionEntry[];
   profile: Profile;
 }
 
@@ -54,6 +55,7 @@ export async function parseBackupFile(file: File): Promise<BackupData> {
     !isArray(data.weightEntries) ||
     (data.stepEntries !== undefined && !isArray(data.stepEntries)) ||
     (data.customFoods !== undefined && !isArray(data.customFoods)) ||
+    (data.conditions !== undefined && !isArray(data.conditions)) ||
     !isArray(data.bowelEntries) ||
     typeof data.profile !== 'object' ||
     data.profile === null
@@ -70,6 +72,7 @@ export async function parseBackupFile(file: File): Promise<BackupData> {
     stepEntries: isArray(data.stepEntries) ? (data.stepEntries as StepEntry[]) : [],
     bowelEntries: data.bowelEntries as BowelEntry[],
     customFoods: isArray(data.customFoods) ? (data.customFoods as CustomFoodItem[]) : [],
+    conditions: isArray(data.conditions) ? (data.conditions as ConditionEntry[]) : [],
     profile: data.profile as Profile,
   };
 }
@@ -119,6 +122,7 @@ export function mergeBackupData(
     stepEntries: sortByDate(mergeById(base.stepEntries, incoming.stepEntries)),
     bowelEntries: sortByDate(mergeById(base.bowelEntries, incoming.bowelEntries)),
     customFoods: mergeById(base.customFoods, incoming.customFoods),
+    conditions: mergeById(base.conditions, incoming.conditions),
     profile: mergeProfile(base.profile, incoming.profile),
   };
 }
@@ -167,6 +171,7 @@ export function readLegacyLocalStorage(): Omit<BackupData, 'version' | 'exported
     stepEntries: readLegacyArray<StepEntry>(LEGACY_KEYS.stepEntries),
     bowelEntries: readLegacyArray<BowelEntry>(LEGACY_KEYS.bowelEntries),
     customFoods: readLegacyArray<CustomFoodItem>(LEGACY_KEYS.customFoods),
+    conditions: [],
     profile: readLegacyProfile(),
   };
 }
@@ -178,6 +183,7 @@ export function countBackupEntries(data: Omit<BackupData, 'version' | 'exportedA
     data.weightEntries.length +
     data.stepEntries.length +
     data.bowelEntries.length +
-    data.customFoods.length
+    data.customFoods.length +
+    data.conditions.length
   );
 }

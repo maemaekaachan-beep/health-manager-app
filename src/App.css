@@ -166,7 +166,8 @@
 }
 
 .form-group input,
-.form-group select {
+.form-group select,
+.form-group textarea {
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -178,8 +179,15 @@
   width: 100%;
 }
 
+.form-group textarea {
+  font-family: inherit;
+  resize: vertical;
+  min-height: 38px;
+}
+
 .form-group input:focus,
-.form-group select:focus {
+.form-group select:focus,
+.form-group textarea:focus {
   border-color: var(--accent);
 }
 
@@ -340,6 +348,17 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.entry-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.entry-name-row .entry-name {
+  min-width: 0;
 }
 
 .entry-time {
@@ -907,6 +926,21 @@
 .status-pill--high {
   color: #f87171;
   background: rgba(239, 68, 68, 0.14);
+}
+
+.status-pill--condition-new {
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.14);
+}
+
+.status-pill--condition-monitoring {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.14);
+}
+
+.status-pill--condition-remission {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.14);
 }
 
 .nutrition-disclaimer {

@@ -33,6 +33,14 @@ await sql.query(
 console.log('ok: custom_foods');
 
 await sql.query(
+  `create table if not exists conditions (
+     id text primary key,
+     payload jsonb not null
+   )`
+);
+console.log('ok: conditions');
+
+await sql.query(
   `create table if not exists profile (
      id smallint primary key default 1,
      payload jsonb not null default '{}'

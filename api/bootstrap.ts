@@ -9,7 +9,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const [meals, sleepEntries, weightEntries, stepEntries, bowelEntries, customFoods, profileRows] =
+    const [meals, sleepEntries, weightEntries, stepEntries, bowelEntries, customFoods, conditions, profileRows] =
       await Promise.all([
         sql`select payload from meals order by date asc`,
         sql`select payload from sleep_entries order by date asc`,
@@ -17,6 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         sql`select payload from step_entries order by date asc`,
         sql`select payload from bowel_entries order by date asc`,
         sql`select payload from custom_foods order by payload->>'name' asc`,
+        sql`select payload from conditions order by payload->>'name' asc`,
         sql`select payload from profile where id = 1`,
       ]);
 
@@ -27,6 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       stepEntries: stepEntries.map((r) => r.payload),
       bowelEntries: bowelEntries.map((r) => r.payload),
       customFoods: customFoods.map((r) => r.payload),
+      conditions: conditions.map((r) => r.payload),
       profile: profileRows[0]?.payload ?? {},
     });
   } catch (err) {

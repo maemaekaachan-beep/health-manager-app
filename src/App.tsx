@@ -1,4 +1,4 @@
-import { LayoutDashboard, Utensils, Moon, Scale, Footprints, Apple, ClipboardList, User } from 'lucide-react';
+import { LayoutDashboard, Utensils, Moon, Scale, Footprints, Apple, ClipboardList, HeartPulse, User } from 'lucide-react';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useCloudData } from './hooks/useCloudData';
 import type { TabType } from './types';
@@ -9,6 +9,7 @@ import WeightTracker from './components/WeightTracker';
 import StepTracker from './components/StepTracker';
 import NutritionTracker from './components/NutritionTracker';
 import BowelTracker from './components/BowelTracker';
+import ConditionTracker from './components/ConditionTracker';
 import ProfileSettings from './components/ProfileSettings';
 import './App.css';
 
@@ -20,13 +21,14 @@ const TABS: { id: TabType; label: string; icon: React.ReactNode }[] = [
   { id: 'steps', label: '歩数', icon: <Footprints size={20} /> },
   { id: 'nutrition', label: '栄養素', icon: <Apple size={20} /> },
   { id: 'bowel', label: '排便', icon: <ClipboardList size={20} /> },
+  { id: 'conditions', label: '疾患・症状', icon: <HeartPulse size={20} /> },
   { id: 'profile', label: 'プロフィール', icon: <User size={20} /> },
 ];
 
 export default function App() {
   const [activeTab, setActiveTab] = useLocalStorage<TabType>('health-active-tab', 'dashboard');
   const {
-    meals, sleepEntries, weightEntries, stepEntries, bowelEntries, customFoods, profile,
+    meals, sleepEntries, weightEntries, stepEntries, bowelEntries, customFoods, conditions, profile,
     loading, error, reload,
     addMeal, deleteMeal,
     addSleep, deleteSleep,
@@ -34,6 +36,7 @@ export default function App() {
     addStep, deleteStep,
     addBowel, deleteBowel,
     addCustomFood, updateCustomFood, deleteCustomFood,
+    addCondition, updateCondition, deleteCondition,
     saveProfile, restoreAll,
   } = useCloudData();
 
@@ -130,11 +133,19 @@ export default function App() {
             onDelete={deleteBowel}
           />
         )}
+        {activeTab === 'conditions' && (
+          <ConditionTracker
+            entries={conditions}
+            onAdd={addCondition}
+            onUpdate={updateCondition}
+            onDelete={deleteCondition}
+          />
+        )}
         {activeTab === 'profile' && (
           <ProfileSettings
             profile={profile}
             onSave={saveProfile}
-            backupData={{ meals, sleepEntries, weightEntries, stepEntries, bowelEntries, customFoods, profile }}
+            backupData={{ meals, sleepEntries, weightEntries, stepEntries, bowelEntries, customFoods, conditions, profile }}
             onRestore={restoreAll}
           />
         )}

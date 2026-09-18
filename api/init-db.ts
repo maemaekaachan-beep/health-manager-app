@@ -30,6 +30,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     );
 
     await sql.query(
+      `create table if not exists conditions (
+         id text primary key,
+         payload jsonb not null
+       )`
+    );
+
+    await sql.query(
       `create table if not exists profile (
          id smallint primary key default 1,
          payload jsonb not null default '{}'

@@ -15,10 +15,17 @@ export const LIST_TABLES = {
   steps: 'step_entries',
   bowel: 'bowel_entries',
   'custom-foods': 'custom_foods',
+  conditions: 'conditions',
 } as const;
 
 export type ListResource = keyof typeof LIST_TABLES;
 
 export function isListResource(value: string): value is ListResource {
   return Object.prototype.hasOwnProperty.call(LIST_TABLES, value);
+}
+
+const NO_DATE_RESOURCES = new Set<ListResource>(['custom-foods', 'conditions']);
+
+export function resourceHasDate(resource: ListResource): boolean {
+  return !NO_DATE_RESOURCES.has(resource);
 }

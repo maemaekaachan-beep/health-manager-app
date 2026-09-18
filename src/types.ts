@@ -67,4 +67,13 @@ export interface StepEntry {
   steps: number;
 }
 
-export type TabType = 'dashboard' | 'meal' | 'sleep' | 'weight' | 'steps' | 'nutrition' | 'bowel' | 'profile';
+export type ConditionStatus = 'new' | 'monitoring' | 'remission';
+
+export interface ConditionEntry {
+  id: string;
+  name: string;
+  status: ConditionStatus;
+  note?: string;
+}
+
+export type TabType = 'dashboard' | 'meal' | 'sleep' | 'weight' | 'steps' | 'nutrition' | 'bowel' | 'conditions' | 'profile';

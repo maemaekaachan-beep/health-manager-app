@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { User, Save, Download, Upload } from 'lucide-react';
-import type { Profile, MealEntry, SleepEntry, WeightEntry, StepEntry, BowelEntry } from '../types';
+import type { Profile, MealEntry, SleepEntry, WeightEntry, StepEntry, BowelEntry, ConditionEntry } from '../types';
 import type { CustomFoodItem } from '../data/foodDatabase';
 import {
   exportBackup,
@@ -28,6 +28,7 @@ interface BackupPayload {
   stepEntries: StepEntry[];
   bowelEntries: BowelEntry[];
   customFoods: CustomFoodItem[];
+  conditions: ConditionEntry[];
   profile: Profile;
 }
 
