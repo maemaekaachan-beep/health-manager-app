@@ -5,11 +5,10 @@
 ### 初回セットアップ
 
 1. Vercel ダッシュボードでこのプロジェクトに Postgres (Neon統合) を追加する。
-2. スキーマ作成(初回のみ): デプロイ後に一度だけ `curl -X POST https://<デプロイURL>/api/init-db` を実行する。
-   - Neon統合が発行する `DATABASE_URL` 等は Vercel 側で「Sensitive」指定されており、`vercel env pull` ではローカルに値を取得できない(空文字になる)。そのためローカルの `scripts/init-db.mjs` 経由では実行できず、`api/init-db.ts` をVercel上で直接叩く方式にしている。
-   - ローカルで `scripts/init-db.mjs` を使いたい場合は、Vercelダッシュボードの Environment Variables で該当変数の「Sensitive」を解除してから `vercel env pull .env.local` する。
-3. `/api/init-db` は `CREATE TABLE IF NOT EXISTS` のみで何度呼んでも安全(データを壊さない)。
-4. ローカル開発時、`/api` はローカルでは呼べない(同じくSensitive変数の制約で `vercel dev` でもDBに繋がらない)ため、DB絡みの動作確認は実際にデプロイして行う。
+2. スキーマ作成は `npm run build` の `prebuild` フックから `scripts/migrate.ts` が自動実行される。Vercel上のビルド(Production/Preview共通)は常に `npm run build` を通るため、デプロイのたびに自動でスキーマが最新化され、手動での初期化操作は不要。
+   - `scripts/migrate.ts` は `CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS` のみで構成されており、既存データを壊さず何度実行しても安全。Preview環境で実行されても本番データへの書き込み・削除は発生しない。
+   - Neon統合が発行する `DATABASE_URL` 等は Vercel 側で「Sensitive」指定されており、`vercel env pull` ではローカルに値を取得できない(空文字になる)。そのため `scripts/migrate.ts` をローカルで動かして動作確認したい場合は、Vercelダッシュボードの Environment Variables で該当変数の「Sensitive」を解除してから `vercel env pull .env.local` するか、別途ローカル用の `.env.local` に `DATABASE_URL` を手動で設定する。
+3. ローカル開発時、`/api` はローカルでは呼べない(同じくSensitive変数の制約で `vercel dev` でもDBに繋がらない)ため、DB絡みの動作確認は実際にデプロイして行う。
 
 ### PCとスマホのデータを統合する手順
 
