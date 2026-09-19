@@ -3,54 +3,17 @@
 // 「追加のみ」で投入する。既存データの削除・上書きは一切行わない(profileテーブルも触らない)。
 //
 // 安全のため、実行前に接続先ホストがデモ用DB(health-manager-demo)であることを
-// 確認し、一致しない場合・判定できない場合は必ず中断する。
+// 確認し、一致しない場合・判定できない場合は必ず中断する(scripts/_db-guard.ts)。
 //
 // 使い方:
 //   npx tsx --env-file=.env.local scripts/seed.ts        # 対話確認あり
 //   npx tsx --env-file=.env.local scripts/seed.ts --yes   # 確認をスキップ(CI等)
-import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'node:crypto';
-import { createInterface } from 'node:readline/promises';
-import { stdin, stdout } from 'node:process';
+import { connectToDemoDatabase, confirm } from './_db-guard.ts';
+import { getNutrientTargets, type TargetSpec } from '../src/data/nutritionReference.ts';
+import type { Profile } from '../src/types.ts';
 
-const connectionString = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
-if (!connectionString) {
-  throw new Error('DATABASE_URL (or POSTGRES_URL) environment variable is not set');
-}
-
-let host: string;
-try {
-  host = new URL(connectionString).hostname;
-} catch {
-  console.error('DATABASE_URL の形式が不正で接続先ホストを判定できません。安全のため中断します。');
-  process.exit(1);
-}
-
-// health-manager-demo (Vercel) の Neon エンドポイントID。
-// .env.local を `vercel env pull` で取得した際のホスト名から採取したもので、
-// このスクリプトは接続先がここと一致する場合にのみ実行を続ける。
-const EXPECTED_DEMO_HOST_FRAGMENT = 'ep-crimson-voice-avwwl5bj';
-
-if (!host.includes(EXPECTED_DEMO_HOST_FRAGMENT)) {
-  console.error(
-    `接続先ホスト "${host}" がデモ用DB (${EXPECTED_DEMO_HOST_FRAGMENT} を含むはず) と一致しません。\n` +
-      '本番など別環境のDATABASE_URLを読み込んでいないか確認してください。安全のため中断します。'
-  );
-  process.exit(1);
-}
-
-const sql = neon(connectionString);
-
-async function confirm(message: string): Promise<boolean> {
-  if (process.argv.includes('--yes') || process.argv.includes('-y')) return true;
-  const rl = createInterface({ input: stdin, output: stdout });
-  try {
-    const answer = await rl.question(message);
-    return answer.trim().toLowerCase() === 'yes';
-  } finally {
-    rl.close();
-  }
-}
+const { sql, host } = connectToDemoDatabase();
 
 function dateStr(daysAgo: number): string {
   const d = new Date();
@@ -65,6 +28,23 @@ function rand(min: number, max: number, decimals = 0): number {
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
+}
+
+// カロリー配分などと同じ考え方で、日別合計値を各食事のカロリー比率に応じて
+// ばらつきを持たせつつ配分する(合計は dailyTotal に一致するよう正規化する)。
+function distribute(dailyTotal: number, mealCalories: number[], decimals: number): number[] {
+  const totalCal = mealCalories.reduce((a, b) => a + b, 0);
+  const raw = mealCalories.map((c) => (c / totalCal) * dailyTotal * (rand(85, 115) / 100));
+  const rawSum = raw.reduce((a, b) => a + b, 0);
+  const scale = rawSum === 0 ? 0 : dailyTotal / rawSum;
+  return raw.map((v) => {
+    const scaled = v * scale;
+    return decimals ? Number(scaled.toFixed(decimals)) : Math.round(scaled);
+  });
+}
+
+function specMidpoint(spec: TargetSpec): number {
+  return spec.kind === 'range' ? (spec.min + spec.max) / 2 : spec.value;
 }
 
 // ---- 食事 ----
@@ -91,6 +71,14 @@ interface MealRow {
   protein: number;
   fat: number;
   carbs: number;
+  calcium: number;
+  iron: number;
+  vitaminA: number;
+  vitaminB1: number;
+  vitaminB2: number;
+  vitaminC: number;
+  vitaminE: number;
+  fiber: number;
   salt: number;
 }
 
@@ -100,14 +88,25 @@ const weightEntries: { id: string; date: string; weight: number; bodyFat: number
 const stepEntries: { id: string; date: string; steps: number }[] = [];
 const bowelEntries: { id: string; date: string; time: string; bristol: number; amount: string; count: number }[] = [];
 
+// 実際のプロフィール(年齢・性別)に基づいて、アプリと同じ推奨摂取量ロジックから
+// 栄養素の目安値を取得する。プロフィール未設定の場合は30歳・女性を仮定する。
+const profileRows = (await sql`select payload from profile where id = 1`) as unknown as { payload: Partial<Profile> }[];
+const profile = profileRows[0]?.payload ?? {};
+const profileForTargets: Profile = profile.age && profile.gender ? (profile as Profile) : { age: 30, gender: 'female' };
+const targets = getNutrientTargets(profileForTargets);
+if (!targets) {
+  throw new Error('栄養素の目安値を算出できませんでした(想定外のプロフィール値)');
+}
+
 const DAYS = 14;
 
-// 体重は日々の急変を避けるため、古い日付から順にランダムウォークで生成する。
+// 体重は日々の急変を避けるため、古い日付から順に「前日比±0.5kg以内」の
+// ランダムウォークで生成する(64.0〜66.9kg台に収める)。1日1件のみ。
 let walkingWeight = rand(640, 660, 1) / 10; // 64.0〜66.0kg からスタート
 const weightByDaysAgo = new Map<number, number>();
 for (let daysAgo = DAYS - 1; daysAgo >= 0; daysAgo--) {
-  walkingWeight += rand(-20, 20, 1) / 10; // 1日あたり最大±2.0kg... ではなく±0.2kg
-  walkingWeight = Math.min(66.5, Math.max(64.0, Number(walkingWeight.toFixed(1))));
+  walkingWeight += rand(-5, 5, 1) / 10; // 前日比 ±0.5kg 以内
+  walkingWeight = Math.min(66.9, Math.max(64.0, Number(walkingWeight.toFixed(1))));
   weightByDaysAgo.set(daysAgo, walkingWeight);
 }
 
@@ -120,9 +119,38 @@ for (let daysAgo = 0; daysAgo < DAYS; daysAgo++) {
   const rawCalories = categories.map((c) => CALORIE_RATIO[c] * dailyTarget * (rand(85, 115) / 100));
   const rawSum = rawCalories.reduce((a, b) => a + b, 0);
   const scale = dailyTarget / rawSum;
+  const mealCalories = rawCalories.map((v) => Math.round(v * scale));
+
+  // 栄養素の日別合計値(アプリの推奨摂取量ロジックに合わせて算出)。
+  // たんぱく質は目安の1.05〜1.3倍程度(平均して約1.2倍)、塩分は6.0〜8.0gに収め、
+  // 赤(過剰)表示が常時にならないようにする。他の栄養素は目安の80〜120%でばらつかせる。
+  const dailyProtein = targets.protein.kind === 'target' ? targets.protein.value * (rand(105, 130) / 100) : 60;
+  const dailyFat = (dailyTarget * (rand(22, 28) / 100)) / 9;
+  const dailyCarbs = (dailyTarget * (rand(53, 62) / 100)) / 4;
+  const dailySalt = rand(60, 80) / 10;
+  const dailyCalcium = specMidpoint(targets.calcium) * (rand(80, 120) / 100);
+  const dailyIron = specMidpoint(targets.iron) * (rand(80, 120) / 100);
+  const dailyVitaminA = specMidpoint(targets.vitaminA) * (rand(80, 120) / 100);
+  const dailyVitaminB1 = specMidpoint(targets.vitaminB1) * (rand(80, 120) / 100);
+  const dailyVitaminB2 = specMidpoint(targets.vitaminB2) * (rand(80, 120) / 100);
+  const dailyVitaminC = specMidpoint(targets.vitaminC) * (rand(80, 130) / 100);
+  const dailyVitaminE = specMidpoint(targets.vitaminE) * (rand(80, 120) / 100);
+  const dailyFiber = specMidpoint(targets.fiber) * (rand(80, 115) / 100);
+
+  const proteinPerMeal = distribute(dailyProtein, mealCalories, 0);
+  const fatPerMeal = distribute(dailyFat, mealCalories, 0);
+  const carbsPerMeal = distribute(dailyCarbs, mealCalories, 0);
+  const saltPerMeal = distribute(dailySalt, mealCalories, 1);
+  const calciumPerMeal = distribute(dailyCalcium, mealCalories, 0);
+  const ironPerMeal = distribute(dailyIron, mealCalories, 1);
+  const vitaminAPerMeal = distribute(dailyVitaminA, mealCalories, 0);
+  const vitaminB1PerMeal = distribute(dailyVitaminB1, mealCalories, 2);
+  const vitaminB2PerMeal = distribute(dailyVitaminB2, mealCalories, 2);
+  const vitaminCPerMeal = distribute(dailyVitaminC, mealCalories, 0);
+  const vitaminEPerMeal = distribute(dailyVitaminE, mealCalories, 1);
+  const fiberPerMeal = distribute(dailyFiber, mealCalories, 1);
 
   categories.forEach((category, idx) => {
-    const calories = Math.round(rawCalories[idx] * scale);
     const names = mealNames[category];
     const baseTime =
       category === 'breakfast' ? [7, 0] : category === 'lunch' ? [12, 30] : category === 'dinner' ? [19, 0] : [15, 0];
@@ -134,31 +162,41 @@ for (let daysAgo = 0; daysAgo < DAYS; daysAgo++) {
       date,
       time: `${pad2(hour)}:${pad2(minute)}`,
       name: names[Math.floor(Math.random() * names.length)],
-      calories,
+      calories: mealCalories[idx],
       category,
-      protein: rand(10, 35),
-      fat: rand(5, 20),
-      carbs: rand(20, 80),
-      salt: rand(10, 45, 1) / 10,
+      protein: proteinPerMeal[idx],
+      fat: fatPerMeal[idx],
+      carbs: carbsPerMeal[idx],
+      calcium: calciumPerMeal[idx],
+      iron: ironPerMeal[idx],
+      vitaminA: vitaminAPerMeal[idx],
+      vitaminB1: vitaminB1PerMeal[idx],
+      vitaminB2: vitaminB2PerMeal[idx],
+      vitaminC: vitaminCPerMeal[idx],
+      vitaminE: vitaminEPerMeal[idx],
+      fiber: fiberPerMeal[idx],
+      salt: saltPerMeal[idx],
     });
   });
 
-  // 睡眠: 6〜9時間
-  const durationMin = rand(360, 540);
-  const wakeHour = rand(6, 8);
-  const wakeMinute = rand(0, 59);
-  const wakeTotalMin = wakeHour * 60 + wakeMinute;
-  const bedTotalMin = (wakeTotalMin - durationMin + 24 * 60) % (24 * 60);
-  sleepEntries.push({
-    id: randomUUID(),
-    date,
-    bedtime: `${pad2(Math.floor(bedTotalMin / 60))}:${pad2(bedTotalMin % 60)}`,
-    wakeTime: `${pad2(wakeHour)}:${pad2(wakeMinute)}`,
-    duration: durationMin,
-    quality: rand(2, 5),
-  });
+  // 睡眠: 6〜9時間。今日(daysAgo=0)は就寝時刻が未来になり得るため作らない。1日1件のみ。
+  if (daysAgo > 0) {
+    const durationMin = rand(360, 540);
+    const wakeHour = rand(6, 8);
+    const wakeMinute = rand(0, 59);
+    const wakeTotalMin = wakeHour * 60 + wakeMinute;
+    const bedTotalMin = (wakeTotalMin - durationMin + 24 * 60) % (24 * 60);
+    sleepEntries.push({
+      id: randomUUID(),
+      date,
+      bedtime: `${pad2(Math.floor(bedTotalMin / 60))}:${pad2(bedTotalMin % 60)}`,
+      wakeTime: `${pad2(wakeHour)}:${pad2(wakeMinute)}`,
+      duration: durationMin,
+      quality: rand(2, 5),
+    });
+  }
 
-  // 体重: 64〜66kg台でゆるく増減(ランダムウォーク)
+  // 体重: 64〜66kg台で前日比±0.5kg以内のランダムウォーク。1日1件のみ。
   weightEntries.push({
     id: randomUUID(),
     date,
@@ -167,7 +205,7 @@ for (let daysAgo = 0; daysAgo < DAYS; daysAgo++) {
     note: '',
   });
 
-  // 歩数
+  // 歩数。1日1件のみ。
   stepEntries.push({
     id: randomUUID(),
     date,
